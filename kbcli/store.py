@@ -52,6 +52,36 @@ class Store:
         index = self.load_index()
         return index.get(entry_id)
 
+    def resolve_entry(self, entry_id: str) -> Optional[Entry]:
+        """根据ID解析条目，支持完整ID和前缀匹配。
+
+        返回 (entry, error_message) 元组：
+        - 找到唯一匹配：(entry, None)
+        - 未找到：(None, 错误提示)
+        - 多个匹配：(None, 列出所有匹配的提示)
+        """
+        index = self.load_index()
+        if not index:
+            return None, '知识库为空，没有任何条目'
+
+        if entry_id in index:
+            return index[entry_id], None
+
+        candidates = [e for eid, e in index.items() if eid.startswith(entry_id)]
+
+        if len(candidates) == 0:
+            return None, (
+                f'未找到ID为 "{entry_id}" 的条目。\n'
+                f'提示：请确认输入的ID是否正确，或使用 `kb list` 查看所有条目。'
+            )
+        elif len(candidates) == 1:
+            return candidates[0], None
+        else:
+            lines = [f'ID "{entry_id}" 匹配到多个条目，请使用更长的前缀：']
+            for e in candidates:
+                lines.append(f'  {e.id}  {e.title}')
+            return None, '\n'.join(lines)
+
     def update_entry(self, entry: Entry) -> Entry:
         index = self.load_index()
         entry.updated_at = datetime.now().isoformat()
@@ -140,13 +170,17 @@ class Store:
         with open(self.config.shortcuts_path, 'r', encoding='utf-8') as f:
             return json.load(f)
 
-    def save_shortcut(self, name: str, command: str, description: str = ''):
+    def save_shortcut(self, name: str, command: str, description: str = '',
+                      args: Optional[List[str]] = None):
         shortcuts = self.load_shortcuts()
-        shortcuts[name] = {
+        data = {
             'command': command,
             'description': description,
             'created_at': datetime.now().isoformat(),
         }
+        if args is not None:
+            data['args'] = args
+        shortcuts[name] = data
         self._ensure_dirs()
         with open(self.config.shortcuts_path, 'w', encoding='utf-8') as f:
             json.dump(shortcuts, f, ensure_ascii=False, indent=2)

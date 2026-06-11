@@ -1,7 +1,13 @@
 {
-  "find-troubleshoot": {
-    "command": "search 故障排查 --tags 故障排查",
-    "description": "快速查找故障排查相关内容",
-    "created_at": "2026-06-12T00:35:01.907657"
+  "find-k8s-trouble": {
+    "command": "search \"Pod 启动失败\" --project k8s",
+    "description": "K8s Pod 故障专用搜索",
+    "created_at": "2026-06-12T01:05:37.780664",
+    "args": [
+      "search",
+      "Pod 启动失败",
+      "--project",
+      "k8s"
+    ]
   }
 }

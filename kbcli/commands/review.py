@@ -47,7 +47,7 @@ def list_review(project, limit):
 @click.option('--review', type=click.Choice(['true', 'false']), help='标记待复审状态')
 @click.option('--expired', type=click.Choice(['true', 'false']), help='标记过期状态')
 def mark_entry(entry_id, review, expired):
-    """标记条目状态"""
+    """标记条目状态（支持短ID前缀匹配）"""
     kb_root = find_kb_root()
     if not kb_root:
         click.echo('错误: 未找到知识库，请先运行 kb init', err=True)
@@ -56,9 +56,9 @@ def mark_entry(entry_id, review, expired):
     config = Config(kb_root)
     store = Store(config)
 
-    entry = store.get_entry(entry_id)
-    if not entry:
-        click.echo(f'错误: 未找到条目 {entry_id}', err=True)
+    entry, err = store.resolve_entry(entry_id)
+    if err:
+        click.echo(f'错误: {err}', err=True)
         sys.exit(1)
 
     if review is not None:
@@ -73,7 +73,8 @@ def mark_entry(entry_id, review, expired):
         status.append('待复审')
     if entry.expired:
         status.append('过期')
-    click.echo(f'条目已标记: {", ".join(status) if status else "无特殊标记"}')
+    click.echo(f'条目已标记: {entry.title} ({entry.id})')
+    click.echo(f'  当前状态: {", ".join(status) if status else "无特殊标记"}')
 
 
 @review_cmd.command('expired')

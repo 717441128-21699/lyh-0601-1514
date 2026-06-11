@@ -125,12 +125,12 @@ def show_cmd(entry_id):
     config = Config(kb_root)
     store = Store(config)
 
-    entry = store.get_entry(entry_id)
-    if not entry:
-        click.echo(f'错误: 未找到条目 {entry_id}', err=True)
+    entry, err = store.resolve_entry(entry_id)
+    if err:
+        click.echo(f'错误: {err}', err=True)
         sys.exit(1)
 
-    store.record_access(entry_id)
+    store.record_access(entry.id)
 
     click.echo(f'标题: {entry.title}')
     click.echo(f'ID: {entry.id}')
@@ -182,9 +182,9 @@ def edit_cmd(entry_id, title, project, tags, content, append, expired, review):
     config = Config(kb_root)
     store = Store(config)
 
-    entry = store.get_entry(entry_id)
-    if not entry:
-        click.echo(f'错误: 未找到条目 {entry_id}', err=True)
+    entry, err = store.resolve_entry(entry_id)
+    if err:
+        click.echo(f'错误: {err}', err=True)
         sys.exit(1)
 
     if title:
@@ -221,9 +221,9 @@ def delete_cmd(entry_id, yes):
     config = Config(kb_root)
     store = Store(config)
 
-    entry = store.get_entry(entry_id)
-    if not entry:
-        click.echo(f'错误: 未找到条目 {entry_id}', err=True)
+    entry, err = store.resolve_entry(entry_id)
+    if err:
+        click.echo(f'错误: {err}', err=True)
         sys.exit(1)
 
     if not yes:
@@ -232,5 +232,5 @@ def delete_cmd(entry_id, yes):
             click.echo('已取消')
             return
 
-    store.delete_entry(entry_id)
-    click.echo(f'条目已删除: {entry_id}')
+    store.delete_entry(entry.id)
+    click.echo(f'条目已删除: {entry.id}')

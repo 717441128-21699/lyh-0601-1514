@@ -18,9 +18,9 @@
     "expired": false,
     "needs_review": false,
     "created_at": "2026-06-12T00:30:15.566796",
-    "updated_at": "2026-06-12T00:41:25.042216",
-    "last_accessed": "2026-06-12T00:41:25.042211",
-    "access_count": 1
+    "updated_at": "2026-06-12T01:03:21.916561",
+    "last_accessed": "2026-06-12T01:03:21.916556",
+    "access_count": 2
   },
   "564da94281d4": {
     "id": "564da94281d4",
@@ -35,9 +35,9 @@
     "links": [],
     "ticket_links": [],
     "expired": true,
-    "needs_review": false,
+    "needs_review": true,
     "created_at": "2026-06-12T00:30:27.068304",
-    "updated_at": "2026-06-12T00:39:56.834000",
+    "updated_at": "2026-06-12T01:03:52.151141",
     "last_accessed": null,
     "access_count": 0
   },

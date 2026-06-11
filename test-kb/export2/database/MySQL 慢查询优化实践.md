@@ -2,16 +2,25 @@
 created_at: '2026-06-12T00:30:27.068304'
 expired: true
 id: 564da94281d4
-links: []
 needs_review: true
 project: database
 tags:
 - 数据库
 - MySQL
 - 性能优化
-ticket_links: []
 title: MySQL 慢查询优化实践
 updated_at: '2026-06-12T01:03:52.151141'
+---
+
+## 基本信息
+
+- **项目**: database
+- **标签**: `数据库`, `MySQL`, `性能优化`
+- **创建时间**: 2026-06-12T00:30:27
+- **更新时间**: 2026-06-12T01:03:52
+- **访问次数**: 0
+- **状态**: 🚫 已过期, 📋 待复审
+
 ---
 
 ## 慢查询定位
