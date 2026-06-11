@@ -1,0 +1,177 @@
+{
+  "title": "复审交接清单",
+  "generated_at": "2026-06-12T02:30:38.746370",
+  "summary": {
+    "total_needs_review": 2,
+    "count_p0_expired_and_review": 1,
+    "count_p2_review_only": 1,
+    "assigned": 1,
+    "unassigned": 1,
+    "total_expired": 1,
+    "count_p1_expired_only": 0,
+    "projects": [
+      "database",
+      "k8s"
+    ],
+    "reviewers": [
+      "张开发",
+      "李运维"
+    ]
+  },
+  "by_reviewer": {
+    "(未指派)": {
+      "total": 1,
+      "count_p0_expired_and_review": 0,
+      "count_p2_review_only": 1,
+      "count_p1_expired_only": 0,
+      "p0_expired_and_needs_review": [],
+      "p2_needs_review_only": [
+        {
+          "id": "81e0653b5d7a",
+          "title": "Redis 缓存穿透问题解决方案",
+          "content": "缓存穿透是指查询一个不存在的数据，缓存和数据库都没有命中。\n\n解决方案：\n1. 布隆过滤器\n2. 缓存空值\n3. 接口层增加校验",
+          "project": "database",
+          "tags": [
+            "数据库",
+            "Redis",
+            "缓存",
+            "故障排查"
+          ],
+          "links": [],
+          "ticket_links": [],
+          "expired": false,
+          "needs_review": true,
+          "reviewer": null,
+          "review_note": null,
+          "review_history": [],
+          "created_at": "2026-06-12T00:30:39.669741",
+          "updated_at": "2026-06-12T00:33:25.504184",
+          "last_accessed": null,
+          "access_count": 0
+        }
+      ],
+      "p1_expired_only": []
+    },
+    "张开发": {
+      "total": 1,
+      "count_p0_expired_and_review": 1,
+      "count_p2_review_only": 0,
+      "count_p1_expired_only": 0,
+      "p0_expired_and_needs_review": [
+        {
+          "id": "564da94281d4",
+          "title": "MySQL 慢查询优化实践",
+          "content": "## 慢查询定位\n使用 slow_query_log 开启慢查询日志。\n\n## 优化方法\n1. 添加索引\n2. 优化 SQL 语句\n3. 分库分表",
+          "project": "database",
+          "tags": [
+            "数据库",
+            "MySQL",
+            "性能优化"
+          ],
+          "links": [],
+          "ticket_links": [],
+          "expired": true,
+          "needs_review": true,
+          "reviewer": "张开发",
+          "review_note": "这篇需要对照MySQL 8.0最新参数更新",
+          "review_history": [
+            {
+              "timestamp": "2026-06-12T01:27:33.575216",
+              "reviewer": "张开发",
+              "note": "这篇需要对照MySQL 8.0最新参数更新"
+            }
+          ],
+          "created_at": "2026-06-12T00:30:27.068304",
+          "updated_at": "2026-06-12T01:27:33.575223",
+          "last_accessed": null,
+          "access_count": 0
+        }
+      ],
+      "p2_needs_review_only": [],
+      "p1_expired_only": []
+    }
+  },
+  "expired_list": [
+    {
+      "id": "564da94281d4",
+      "title": "MySQL 慢查询优化实践",
+      "content": "## 慢查询定位\n使用 slow_query_log 开启慢查询日志。\n\n## 优化方法\n1. 添加索引\n2. 优化 SQL 语句\n3. 分库分表",
+      "project": "database",
+      "tags": [
+        "数据库",
+        "MySQL",
+        "性能优化"
+      ],
+      "links": [],
+      "ticket_links": [],
+      "expired": true,
+      "needs_review": true,
+      "reviewer": "张开发",
+      "review_note": "这篇需要对照MySQL 8.0最新参数更新",
+      "review_history": [
+        {
+          "timestamp": "2026-06-12T01:27:33.575216",
+          "reviewer": "张开发",
+          "note": "这篇需要对照MySQL 8.0最新参数更新"
+        }
+      ],
+      "created_at": "2026-06-12T00:30:27.068304",
+      "updated_at": "2026-06-12T01:27:33.575223",
+      "last_accessed": null,
+      "access_count": 0
+    }
+  ],
+  "needs_review_list": [
+    {
+      "id": "564da94281d4",
+      "title": "MySQL 慢查询优化实践",
+      "content": "## 慢查询定位\n使用 slow_query_log 开启慢查询日志。\n\n## 优化方法\n1. 添加索引\n2. 优化 SQL 语句\n3. 分库分表",
+      "project": "database",
+      "tags": [
+        "数据库",
+        "MySQL",
+        "性能优化"
+      ],
+      "links": [],
+      "ticket_links": [],
+      "expired": true,
+      "needs_review": true,
+      "reviewer": "张开发",
+      "review_note": "这篇需要对照MySQL 8.0最新参数更新",
+      "review_history": [
+        {
+          "timestamp": "2026-06-12T01:27:33.575216",
+          "reviewer": "张开发",
+          "note": "这篇需要对照MySQL 8.0最新参数更新"
+        }
+      ],
+      "created_at": "2026-06-12T00:30:27.068304",
+      "updated_at": "2026-06-12T01:27:33.575223",
+      "last_accessed": null,
+      "access_count": 0
+    },
+    {
+      "id": "81e0653b5d7a",
+      "title": "Redis 缓存穿透问题解决方案",
+      "content": "缓存穿透是指查询一个不存在的数据，缓存和数据库都没有命中。\n\n解决方案：\n1. 布隆过滤器\n2. 缓存空值\n3. 接口层增加校验",
+      "project": "database",
+      "tags": [
+        "数据库",
+        "Redis",
+        "缓存",
+        "故障排查"
+      ],
+      "links": [],
+      "ticket_links": [],
+      "expired": false,
+      "needs_review": true,
+      "reviewer": null,
+      "review_note": null,
+      "review_history": [],
+      "created_at": "2026-06-12T00:30:39.669741",
+      "updated_at": "2026-06-12T00:33:25.504184",
+      "last_accessed": null,
+      "access_count": 0
+    }
+  ]
+}

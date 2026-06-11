@@ -340,6 +340,7 @@ def create_template(name, query, project, tags, reviewer, title_only, body_only,
         'group': group,
         'query_template': query or '',
         'params': params,
+        'presets': {},
         'search_kwargs_template': {
             'must_keywords': [],
             'exclude_keywords': [],
@@ -418,18 +419,35 @@ def preview_template(name):
     else:
         click.echo(f'   范围: 标题+正文')
     click.echo(f'   包含过期: {"是" if kt.get("include_expired") else "否"}')
+
+    presets = t.get('presets', {})
+    if presets:
+        click.echo(f'\n🎛️  参数预设 ({len(presets)} 套):')
+        for pname, pdata in presets.items():
+            desc = pdata.get('description', '')
+            values = pdata.get('params', {})
+            val_disp = ', '.join(f'{k}={v}' for k, v in values.items()) or '(空)'
+            click.echo(f'   • {pname}: {val_disp}')
+            if desc:
+                click.echo(f'     � {desc}')
+    else:
+        click.echo(f'\n🎛️  参数预设: 暂无 (使用 `kb template preset add {name} <预设名>` 添加)')
+
     click.echo()
-    click.echo(f'💡 执行命令: kb template run {name}')
+    click.echo(f'� 执行命令: kb template run {name}')
+    if presets:
+        click.echo(f'   使用预设: kb template run {name} --preset {list(presets.keys())[0]}')
 
 
 @template_cmd.command('run')
 @click.argument('name')
-@click.option('--param', multiple=True, help='直接提供参数 key=value，可多次使用')
+@click.option('--param', multiple=True, help='直接提供参数 key=value，可多次使用（覆盖预设）')
+@click.option('--preset', help='选择预设参数方案（查看预设: kb template preview <模板名>）')
 @click.option('--limit', '-n', type=int, default=20, help='结果数量限制')
 @click.option('--yes', '-y', is_flag=True, help='导出清单时跳过确认')
 @click.option('--export-checklist', '-e', 'export_dir',
               help='将结果导出为排障清单 Markdown 到指定目录')
-def run_template(name, param, limit, yes, export_dir):
+def run_template(name, param, preset, limit, yes, export_dir):
     """运行 Saved Query 模板（交互式填参数，结果可导出排障清单）"""
     kb_root = find_kb_root()
     if not kb_root:
@@ -447,6 +465,21 @@ def run_template(name, param, limit, yes, export_dir):
     template = templates[name]
     param_specs = template.get('params', [])
 
+    # 解析预设
+    preset_data = {}
+    preset_name = None
+    all_presets = template.get('presets', {})
+    if preset:
+        if preset not in all_presets:
+            avail = ', '.join(all_presets.keys()) if all_presets else '（无预设）'
+            click.echo(f'错误: 预设 "{preset}" 不存在。可用预设: {avail}', err=True)
+            sys.exit(1)
+        preset_data = all_presets[preset].get('params', {})
+        preset_name = preset
+        click.echo(f'🎛️  使用预设: {preset}')
+        if all_presets[preset].get('description'):
+            click.echo(f'   📝 {all_presets[preset]["description"]}')
+
     # 解析 --param key=value 覆盖
     overrides = {}
     for p in param:
@@ -454,17 +487,24 @@ def run_template(name, param, limit, yes, export_dir):
             k, v = p.split('=', 1)
             overrides[k.strip()] = v.strip()
 
-    if len(overrides) < len([x for x in param_specs if not x.get('optional')]):
+    # 预设作为默认值，但被 --param 覆盖；同时在 prompt 里也作为默认
+    # _prompt_for_params 的 overrides 是"直接填入不需要交互"的；我们把预设合并进去
+    merged_overrides = dict(preset_data)
+    merged_overrides.update(overrides)
+
+    if len(merged_overrides) < len([x for x in param_specs if not x.get('optional')]):
         click.echo(f'🔍 模板: {name}')
         click.echo(f'📝 {template.get("description", "")}')
         click.echo()
 
-    values = _prompt_for_params(param_specs, overrides)
+    values = _prompt_for_params(param_specs, merged_overrides)
 
     search_ctx = _build_search_from_template(template, values, store)
     results, search_desc = _run_search_with_ctx(store, search_ctx)
 
     click.echo(f'🔍 使用模板 "{name}"')
+    if preset_name:
+        click.echo(f'   预设方案: {preset_name}')
     click.echo(f'   {search_desc}')
     click.echo(f'   找到 {len(results)} 条结果:')
     click.echo('-' * 70)
@@ -491,12 +531,14 @@ def run_template(name, param, limit, yes, export_dir):
         click.echo()
 
     if export_dir and results:
-        _write_checklist_markdown(results, name, search_desc, values, export_dir)
+        _write_checklist_markdown(results, name, search_desc, values, export_dir,
+                                   preset_name=preset_name)
     elif results and not export_dir:
         if yes or click.confirm('是否将结果导出为排障清单 Markdown?', default=False):
             default_dir = f'./checklist-{name}-{datetime.now().strftime("%Y%m%d-%H%M%S")}'
             out_dir = click.prompt('输出目录', default=default_dir, show_default=True)
-            _write_checklist_markdown(results, name, search_desc, values, out_dir)
+            _write_checklist_markdown(results, name, search_desc, values, out_dir,
+                                       preset_name=preset_name)
 
 
 @template_cmd.command('remove')
@@ -544,6 +586,7 @@ def export_templates(output_file, group):
             'group': data.get('group', 'default'),
             'query_template': data.get('query_template', ''),
             'params': data.get('params', []),
+            'presets': data.get('presets', {}),
             'search_kwargs_template': data.get('search_kwargs_template', {}),
         }
 
@@ -686,7 +729,8 @@ def import_templates(input_file, yes, overwrite, prefix, group):
     click.echo(f'   查看: kb template list')
 
 
-def _write_checklist_markdown(results, template_name, search_desc, param_values, output_dir):
+def _write_checklist_markdown(results, template_name, search_desc, param_values, output_dir,
+                               preset_name=None):
     """将搜索结果导出为 Markdown 排障清单。"""
     entries = [r[0] for r in results]
     out_path = Path(output_dir)
@@ -698,6 +742,8 @@ def _write_checklist_markdown(results, template_name, search_desc, param_values,
     lines.append('')
     lines.append(f'> 生成时间: **{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}**')
     lines.append(f'> 使用模板: **{template_name}**')
+    if preset_name:
+        lines.append(f'> 预设方案: **{preset_name}**')
     lines.append('')
 
     if param_values:
@@ -727,11 +773,11 @@ def _write_checklist_markdown(results, template_name, search_desc, param_values,
     lines.append(f'- 📋 待复审: {len(need_review)} 条')
     lines.append('')
 
-    # 逐项清单
+    # 逐项清单（含快捷命令）
     lines.append('## 📋 逐项排障清单')
     lines.append('')
-    lines.append('| # | 标题 | 项目 | 状态 | 负责人 | 备注 | 进度 |')
-    lines.append('|---|------|------|------|--------|------|------|')
+    lines.append('| # | 标题 | 项目 | 状态 | 负责人 | 备注 | 进度 | 快捷命令 |')
+    lines.append('|---|------|------|------|--------|------|------|----------|')
     for i, e in enumerate(entries, 1):
         badges = []
         if e.expired:
@@ -745,10 +791,15 @@ def _write_checklist_markdown(results, template_name, search_desc, param_values,
         if len(note) > 30:
             note = note[:30] + '...'
         note = note or '-'
-        lines.append(f'| {i} | {link_title} | {e.project} | {status_md} | {reviewer} | {note} | ☐ |')
+        short_id = e.id[:8]
+        cmd_show = f'`kb show {short_id}`'
+        cmd_claim = f'`kb review claim {short_id}`'
+        cmd_done = f'`kb review done {short_id} -m "结论"`'
+        quick_cmds = f'{cmd_show}<br>{cmd_claim}<br>{cmd_done}'
+        lines.append(f'| {i} | {link_title} | {e.project} | {status_md} | {reviewer} | {note} | ☐ | {quick_cmds} |')
     lines.append('')
 
-    # 每个条目详情区
+    # 每个条目详情区（含可复制命令代码块）
     lines.append('## 📝 条目详情')
     lines.append('')
     for i, e in enumerate(entries, 1):
@@ -779,7 +830,17 @@ def _write_checklist_markdown(results, template_name, search_desc, param_values,
             lines.append(f'- **参考链接**:')
             for rl in e.links:
                 lines.append(f'  - {rl}')
-        lines.append(f'- **ID**: `{e.id[:8]}`')
+        short_id = e.id[:8]
+        lines.append(f'- **ID**: `{short_id}`')
+        lines.append('')
+        lines.append('#### ⌨️  下一步命令（可直接复制）')
+        lines.append('')
+        lines.append('```bash')
+        lines.append(f'kb show {short_id}                         # 查看完整内容')
+        lines.append(f'kb review claim {short_id}                  # 认领此条目')
+        lines.append(f'kb review done {short_id} -m "结论"          # 完成复审并写结论')
+        lines.append(f'kb review history {short_id}                 # 查看复审历史轨迹')
+        lines.append('```')
         lines.append('')
         lines.append('#### 📌 处理记录')
         lines.append('')
@@ -792,8 +853,9 @@ def _write_checklist_markdown(results, template_name, search_desc, param_values,
 
     lines.append('## 📎 后续步骤')
     lines.append('')
-    lines.append('- [ ] 逐项核对条目内容准确性')
-    lines.append('- [ ] 处理待复审标记，使用 `kb review done <ID> -m "结论"` 完成')
+    lines.append('- [ ] 逐项核对条目内容准确性（使用上方 `kb show <ID>` 查看完整内容）')
+    lines.append('- [ ] 批量认领：`kb review claim <ID1> <ID2> ... -y`')
+    lines.append('- [ ] 批量完成复审：`kb review done <ID1> <ID2> ... -m "统一结论" -y`')
     lines.append('- [ ] 更新过期条目或标记删除')
     lines.append('- [ ] 在条目基础上新增解决经验 `kb add`')
     lines.append('')
@@ -803,3 +865,175 @@ def _write_checklist_markdown(results, template_name, search_desc, param_values,
 
     click.echo(f'\n✅ 排障清单已导出: {checklist_path}')
     click.echo(f'   条目数: {len(entries)}')
+    if preset_name:
+        click.echo(f'   使用预设: {preset_name}')
+
+
+preset_cmd = click.Group(name='preset', help='Saved Query 模板预设参数管理')
+template_cmd.add_command(preset_cmd)
+
+
+@preset_cmd.command('list')
+@click.argument('template_name')
+def list_presets(template_name):
+    """列出某模板的所有参数预设"""
+    kb_root = find_kb_root()
+    if not kb_root:
+        click.echo('错误: 未找到知识库，请先运行 kb init', err=True)
+        sys.exit(1)
+
+    config = Config(kb_root)
+    store = Store(config)
+    templates = store.load_templates()
+
+    if template_name not in templates:
+        click.echo(f'错误: 模板 "{template_name}" 不存在', err=True)
+        sys.exit(1)
+
+    t = templates[template_name]
+    presets = t.get('presets', {})
+    params = t.get('params', [])
+
+    click.echo(f'🎛️  模板 "{template_name}" 的参数预设 ({len(presets)} 套)')
+    click.echo(f'   模板参数: {", ".join("{"+p["name"]+"}" for p in params) or "(无参数)"}')
+    click.echo('')
+
+    if not presets:
+        click.echo('   暂无预设。使用 `kb template preset add` 创建')
+        return
+
+    for pname, pdata in sorted(presets.items()):
+        desc = pdata.get('description', '')
+        values = pdata.get('params', {})
+        click.echo(f'   📌 {pname}')
+        if desc:
+            click.echo(f'      📝 {desc}')
+        if values:
+            for k, v in values.items():
+                click.echo(f'      • {k} = {v}')
+        else:
+            click.echo('      (无参数值)')
+        click.echo('')
+    click.echo(f'   使用: kb template run {template_name} --preset <预设名>')
+
+
+@preset_cmd.command('add')
+@click.argument('template_name')
+@click.argument('preset_name')
+@click.option('--description', '-d', default='', help='预设说明')
+@click.option('--param', '-p', 'params', multiple=True, help='参数 key=value，可多次使用')
+@click.option('--yes', '-y', is_flag=True, help='跳过交互确认')
+def add_preset(template_name, preset_name, description, params, yes):
+    """为模板新增参数预设
+
+    \b
+    用法：
+      kb template preset add db-search database \
+          -p 查询词=慢查询 -p 项目名=database -d "数据库慢查询排查"
+    """
+    kb_root = find_kb_root()
+    if not kb_root:
+        click.echo('错误: 未找到知识库，请先运行 kb init', err=True)
+        sys.exit(1)
+
+    config = Config(kb_root)
+    store = Store(config)
+    templates = store.load_templates()
+
+    if template_name not in templates:
+        click.echo(f'错误: 模板 "{template_name}" 不存在', err=True)
+        sys.exit(1)
+
+    t = templates[template_name]
+    param_specs = t.get('params', [])
+    presets = t.get('presets', {})
+
+    if preset_name in presets and not yes:
+        if not click.confirm(f'预设 "{preset_name}" 已存在，是否覆盖?', default=False):
+            click.echo('已取消')
+            return
+
+    # 解析 -p key=value
+    values = {}
+    for p in params:
+        if '=' in p:
+            k, v = p.split('=', 1)
+            values[k.strip()] = v.strip()
+
+    # 交互补齐
+    if not yes and param_specs:
+        click.echo(f'📋 配置预设 "{preset_name}" 的参数值:')
+        for spec in param_specs:
+            pname = spec['name']
+            current = values.get(pname, '')
+            prompt = f'  {"{"+pname+"}"}'
+            if current:
+                new_val = click.prompt(prompt, default=current, show_default=True)
+            else:
+                optional = spec.get('optional', False)
+                new_val = click.prompt(
+                    prompt,
+                    default=spec.get('default', ''),
+                    show_default=bool(spec.get('default')),
+                )
+            values[pname] = new_val
+
+    click.echo('')
+    click.echo(f'📦 预设预览: {preset_name}')
+    if description:
+        click.echo(f'   说明: {description}')
+    if values:
+        for k, v in values.items():
+            click.echo(f'   • {k} = {v}')
+    click.echo('')
+
+    if not yes and not click.confirm('是否保存该预设?', default=True):
+        click.echo('已取消')
+        return
+
+    presets[preset_name] = {
+        'description': description,
+        'params': values,
+        'created_at': datetime.now().isoformat(),
+    }
+    t['presets'] = presets
+    store.save_template(template_name, t)
+
+    click.echo(f'\n✅ 预设已保存: {template_name} / {preset_name}')
+    click.echo(f'   使用: kb template run {template_name} --preset {preset_name}')
+
+
+@preset_cmd.command('remove')
+@click.argument('template_name')
+@click.argument('preset_name')
+@click.option('--yes', '-y', is_flag=True, help='跳过确认')
+def remove_preset(template_name, preset_name, yes):
+    """删除模板的某个参数预设"""
+    kb_root = find_kb_root()
+    if not kb_root:
+        click.echo('错误: 未找到知识库，请先运行 kb init', err=True)
+        sys.exit(1)
+
+    config = Config(kb_root)
+    store = Store(config)
+    templates = store.load_templates()
+
+    if template_name not in templates:
+        click.echo(f'错误: 模板 "{template_name}" 不存在', err=True)
+        sys.exit(1)
+
+    t = templates[template_name]
+    presets = t.get('presets', {})
+
+    if preset_name not in presets:
+        click.echo(f'错误: 预设 "{preset_name}" 不存在')
+        return
+
+    if not yes and not click.confirm(f'是否删除预设 "{preset_name}"?', default=False):
+        click.echo('已取消')
+        return
+
+    del presets[preset_name]
+    t['presets'] = presets
+    store.save_template(template_name, t)
+    click.echo(f'已删除预设: {template_name} / {preset_name}')

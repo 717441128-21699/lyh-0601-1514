@@ -415,92 +415,123 @@ def stats(by_reviewer):
 
 
 def _build_handoff_markdown(entries, title='复审交接清单'):
-    """生成交接清单的 Markdown 内容。"""
+    """生成交接清单的 Markdown 内容（按负责人分类展示）。"""
     lines = []
     lines.append(f'# 🔄 {title}')
     lines.append('')
     lines.append(f'> 生成时间: **{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}**')
     lines.append('')
 
-    expired = [e for e in entries if e.expired]
     need_review = [e for e in entries if e.needs_review]
+    expired_only = [e for e in entries if e.expired and not e.needs_review]
+    both = [e for e in entries if e.needs_review and e.expired]
+    review_only = [e for e in entries if e.needs_review and not e.expired]
+    all_expired = [e for e in entries if e.expired]
     unassigned = [e for e in need_review if not e.reviewer]
 
     lines.append('## 📊 概览')
     lines.append('')
     lines.append(f'- 📋 待复审总数: **{len(need_review)}** 条')
+    lines.append(f'  - 🚫📋 待复审且已过期: **{len(both)}** 条 (P0 - 立即处理)')
+    lines.append(f'  - 📋 仅待复审: **{len(review_only)}** 条 (P2 - 正常审核)')
     lines.append(f'  - 已指派: **{len(need_review) - len(unassigned)}** 条')
     lines.append(f'  - 未指派: **{len(unassigned)}** 条')
-    lines.append(f'- 🚫 已过期: **{len(expired)}** 条')
-    lines.append(f'- 📁 涉及项目: **{len(set(e.project for e in entries))}** 个')
+    lines.append(f'- 🚫 已过期: **{len(all_expired)}** 条')
+    lines.append(f'  - � 仅过期(无需复审): **{len(expired_only)}** 条 (P1 - 评估是否更新)')
+    lines.append(f'  - 🚫📋 过期且待复审: **{len(both)}** 条 (已计入待复审)')
+    lines.append(f'- � 涉及项目: **{len(set(e.project for e in entries))}** 个')
     lines.append(f'- 👤 负责人数: **{len(set(e.reviewer for e in entries if e.reviewer))}** 人')
     lines.append('')
 
-    lines.append('## 👥 按负责人交接')
+    lines.append('## 👥 按负责人交接看板')
     lines.append('')
 
-    reviewer_map = {}
-    for e in need_review:
-        r = e.reviewer or '(未指派)'
-        if r not in reviewer_map:
-            reviewer_map[r] = []
-        reviewer_map[r].append(e)
+    all_reviewers = set()
+    for e in entries:
+        if e.reviewer:
+            all_reviewers.add(e.reviewer)
+    if any(e for e in entries if not e.reviewer):
+        all_reviewers.add('(未指派)')
 
-    if not reviewer_map:
-        lines.append('暂无待复审条目 ✅')
-        lines.append('')
-
-    for reviewer in sorted(reviewer_map.keys()):
-        rev_entries = sorted(reviewer_map[reviewer], key=lambda x: x.updated_at)
-        rev_expired = [e for e in rev_entries if e.expired]
-        reviewer_icon = '👤' if reviewer != '(未指派)' else '⚠️ '
-        lines.append(f'### {reviewer_icon} {reviewer} (共 {len(rev_entries)} 条)')
-        lines.append('')
-        if rev_expired:
-            lines.append(f'> ⚠️  其中 **{len(rev_expired)}** 条已过期，需要优先处理')
-            lines.append('')
-        lines.append('| # | 标题 | 项目 | 状态 | 备注 | 更新时间 | ID |')
-        lines.append('|---|------|------|------|------|----------|----|')
-        for i, e in enumerate(rev_entries, 1):
-            title_link = e.title.replace('|', '\\|')
-            badges = []
-            if e.expired:
-                badges.append('🚫过期')
+    def _row_for_table(i, e):
+        title_link = e.title.replace('|', '\\|')
+        badges = []
+        if e.expired:
+            badges.append('🚫过期')
+        if e.needs_review:
             badges.append('📋待复审')
-            status_md = ' '.join(badges)
-            note_md = (e.review_note or '').replace('|', '\\|')
-            if len(note_md) > 40:
-                note_md = note_md[:40] + '...'
-            lines.append(f'| {i} | {title_link} | {e.project} | {status_md} | {note_md or "-"} | {e.updated_at[:10]} | `{e.id[:8]}` |')
-        lines.append('')
+        status_md = ' '.join(badges) if badges else '✅'
+        note_md = (e.review_note or '').replace('|', '\\|')
+        if len(note_md) > 40:
+            note_md = note_md[:40] + '...'
+        return f'| {i} | {title_link} | {e.project} | {status_md} | {note_md or "-"} | {e.updated_at[:10]} | `{e.id[:8]}` |'
 
-    if expired:
-        lines.append('## 🚫 过期内容清单')
+    if not all_reviewers:
+        lines.append('暂无待处理条目 ✅')
         lines.append('')
-        lines.append('| # | 标题 | 项目 | 负责人 | 备注 | 更新时间 |')
-        lines.append('|---|------|------|--------|------|----------|')
-        for i, e in enumerate(sorted(expired, key=lambda x: x.updated_at), 1):
-            title_link = e.title.replace('|', '\\|')
-            note_md = (e.review_note or '').replace('|', '\\|')
-            if len(note_md) > 40:
-                note_md = note_md[:40] + '...'
-            lines.append(f'| {i} | {title_link} | {e.project} | {e.reviewer or "-"} | {note_md or "-"} | {e.updated_at[:10]} |')
-        lines.append('')
+    else:
+        for reviewer in sorted(all_reviewers):
+            rev_entries = [e for e in entries
+                           if (e.reviewer or '(未指派)') == reviewer]
+            rev_both = sorted([e for e in rev_entries if e.needs_review and e.expired],
+                              key=lambda x: x.updated_at)
+            rev_review_only = sorted([e for e in rev_entries if e.needs_review and not e.expired],
+                                     key=lambda x: x.updated_at)
+            rev_expired_only = sorted([e for e in rev_entries if e.expired and not e.needs_review],
+                                      key=lambda x: x.updated_at)
+
+            total = len(rev_both) + len(rev_review_only) + len(rev_expired_only)
+            if total == 0:
+                continue
+            reviewer_icon = '👤' if reviewer != '(未指派)' else '⚠️ '
+            lines.append(f'### {reviewer_icon} {reviewer} (共 {total} 条)')
+            lines.append('')
+            lines.append(f'> 📋 待复审:{len(rev_both)+len(rev_review_only)} (P0过期+待审:{len(rev_both)}, P2仅待审:{len(rev_review_only)}) '
+                         f'| 🚫 仅过期(P1):{len(rev_expired_only)}')
+            lines.append('')
+
+            if rev_both:
+                lines.append('#### ⚠️  P0 - 已过期且待复审')
+                lines.append('')
+                lines.append('| # | 标题 | 项目 | 状态 | 备注 | 更新时间 | ID |')
+                lines.append('|---|------|------|------|------|----------|----|')
+                for i, e in enumerate(rev_both, 1):
+                    lines.append(_row_for_table(i, e))
+                lines.append('')
+
+            if rev_review_only:
+                lines.append('#### � P2 - 仅待复审')
+                lines.append('')
+                lines.append('| # | 标题 | 项目 | 状态 | 备注 | 更新时间 | ID |')
+                lines.append('|---|------|------|------|------|----------|----|')
+                for i, e in enumerate(rev_review_only, 1):
+                    lines.append(_row_for_table(i, e))
+                lines.append('')
+
+            if rev_expired_only:
+                lines.append('#### 🚫 P1 - 仅过期（需评估更新或删除）')
+                lines.append('')
+                lines.append('| # | 标题 | 项目 | 状态 | 备注 | 更新时间 | ID |')
+                lines.append('|---|------|------|------|------|----------|----|')
+                for i, e in enumerate(rev_expired_only, 1):
+                    lines.append(_row_for_table(i, e))
+                lines.append('')
 
     lines.append('## 📝 交接说明')
     lines.append('')
     lines.append('### 处理优先级建议：')
     lines.append('1. **P0 - 已过期 + 待复审**：内容已失效且需要审核，立即处理')
-    lines.append('2. **P1 - 已过期**：内容不再适用，更新或删除')
-    lines.append('3. **P2 - 待复审**：检查内容准确性，标记状态')
+    lines.append('2. **P1 - 仅过期**：内容不再适用，评估更新或删除')
+    lines.append('3. **P2 - 仅待复审**：检查内容准确性，标记状态')
     lines.append('')
     lines.append('### 常用命令：')
     lines.append('```bash')
     lines.append('kb review list                      # 查看所有待复审')
-    lines.append('kb review mark <ID> --review false   # 完成复审，清除待复审标记')
-    lines.append('kb review mark <ID> --expired true   # 标记为过期')
     lines.append('kb show <ID>                         # 查看条目的完整内容')
-    lines.append('kb review done <ID> -m "结论"         # 完成复审并写结论')
+    lines.append('kb review claim <ID...>              # 批量认领待复审条目')
+    lines.append('kb review done <ID...> -m "结论"      # 批量完成复审并写结论')
+    lines.append('kb review mark <ID> --review false   # 清除待复审标记')
+    lines.append('kb review mark <ID> --expired true   # 标记为过期')
     lines.append('```')
     lines.append('')
 
@@ -508,30 +539,68 @@ def _build_handoff_markdown(entries, title='复审交接清单'):
 
 
 def _build_handoff_json(entries, title='复审交接清单'):
-    """生成交接清单的 JSON 内容。"""
-    expired = [e for e in entries if e.expired]
+    """生成交接清单的 JSON 内容（按负责人分类展示）。"""
     need_review = [e for e in entries if e.needs_review]
+    review_only = [e for e in entries if e.needs_review and not e.expired]
+    expired_only = [e for e in entries if e.expired and not e.needs_review]
+    both = [e for e in entries if e.needs_review and e.expired]
+    all_expired = [e for e in entries if e.expired]
+    unassigned = [e for e in need_review if not e.reviewer]
 
-    reviewer_map = {}
-    for e in need_review:
-        r = e.reviewer or '(未指派)'
-        if r not in reviewer_map:
-            reviewer_map[r] = []
-        reviewer_map[r].append(e.to_dict())
+    def _classify_for_reviewer(reviewer_name):
+        rev_entries = [e for e in entries
+                       if (e.reviewer or '(未指派)') == reviewer_name]
+        return {
+            'p0_expired_and_needs_review': [e.to_dict() for e in sorted(
+                [e for e in rev_entries if e.needs_review and e.expired],
+                key=lambda x: x.updated_at)],
+            'p2_needs_review_only': [e.to_dict() for e in sorted(
+                [e for e in rev_entries if e.needs_review and not e.expired],
+                key=lambda x: x.updated_at)],
+            'p1_expired_only': [e.to_dict() for e in sorted(
+                [e for e in rev_entries if e.expired and not e.needs_review],
+                key=lambda x: x.updated_at)],
+        }
+
+    all_reviewers = set()
+    for e in entries:
+        if e.reviewer:
+            all_reviewers.add(e.reviewer)
+    if any(e for e in entries if not e.reviewer):
+        all_reviewers.add('(未指派)')
+
+    by_reviewer = {}
+    for r in sorted(all_reviewers):
+        classified = _classify_for_reviewer(r)
+        total = (len(classified['p0_expired_and_needs_review'])
+                 + len(classified['p2_needs_review_only'])
+                 + len(classified['p1_expired_only']))
+        if total > 0:
+            by_reviewer[r] = {
+                'total': total,
+                'count_p0_expired_and_review': len(classified['p0_expired_and_needs_review']),
+                'count_p2_review_only': len(classified['p2_needs_review_only']),
+                'count_p1_expired_only': len(classified['p1_expired_only']),
+                **classified,
+            }
 
     return {
         'title': title,
         'generated_at': datetime.now().isoformat(),
         'summary': {
             'total_needs_review': len(need_review),
+            'count_p0_expired_and_review': len(both),
+            'count_p2_review_only': len(review_only),
             'assigned': len([e for e in need_review if e.reviewer]),
-            'unassigned': len([e for e in need_review if not e.reviewer]),
-            'expired_count': len(expired),
+            'unassigned': len(unassigned),
+            'total_expired': len(all_expired),
+            'count_p1_expired_only': len(expired_only),
             'projects': sorted(set(e.project for e in entries)),
             'reviewers': sorted(set(e.reviewer for e in entries if e.reviewer)),
         },
-        'by_reviewer': {k: v for k, v in sorted(reviewer_map.items())},
-        'expired_list': [e.to_dict() for e in expired],
+        'by_reviewer': by_reviewer,
+        'expired_list': [e.to_dict() for e in all_expired],
+        'needs_review_list': [e.to_dict() for e in need_review],
     }
 
 
@@ -639,78 +708,45 @@ def handoff(reviewer, project, fmt, output, all_entries):
             click.echo(json.dumps(json_data, ensure_ascii=False, indent=2))
 
 
-@review_cmd.command('claim')
-@click.argument('entry_id')
-@click.option('--reviewer', '-r', help='负责人（默认为当前用户名）')
-@click.option('--note', '-m', default='', help='认领备注')
-@click.option('--mark-review', is_flag=True, help='同时标记为待复审')
-def claim_entry(entry_id, reviewer, note, mark_review):
-    """认领条目（记录负责人，加入历史记录轨迹）
-
-    \b
-    用法：
-      kb review claim 564d                          # 认领（默认自己）
-      kb review claim 564d -r 张开发 -m "我来处理"   # 指派给某人
-    """
-    kb_root = find_kb_root()
-    if not kb_root:
-        click.echo('错误: 未找到知识库，请先运行 kb init', err=True)
-        sys.exit(1)
-
-    config = Config(kb_root)
-    store = Store(config)
-
-    entry, err = store.resolve_entry(entry_id)
-    if err:
-        click.echo(f'错误: {err}', err=True)
-        sys.exit(1)
-
+def _do_claim_one(entry, reviewer, note, mark_review, default_reviewer):
+    """执行单条 claim 操作，返回 (entry, old_reviewer, display_note)。"""
     old_reviewer = entry.reviewer
     if reviewer:
         entry.reviewer = reviewer
     else:
-        entry.reviewer = _get_default_reviewer()
+        entry.reviewer = default_reviewer
 
-    old_review = entry.needs_review
+    old_review_status = entry.needs_review
     if mark_review:
         entry.needs_review = True
 
     action_note = note if note else '认领该条目'
-    if old_reviewer:
+    if old_reviewer and old_reviewer != entry.reviewer:
         action_note = f'{action_note}（从 {old_reviewer} 交接）'
 
     entry.add_review_record(
         reviewer=entry.reviewer,
         note=f'[CLAIM] {action_note}',
-        old_review=old_review,
+        old_review=old_review_status,
         new_review=entry.needs_review,
     )
-
-    store.update_entry(entry)
-
-    click.echo(f'✅ 条目已认领: {entry.title} ({entry.id[:8]})')
-    click.echo(f'   负责人: 👤 {entry.reviewer}')
-    if old_reviewer and old_reviewer != entry.reviewer:
-        click.echo(f'   原负责人: {old_reviewer}')
-    if mark_review:
-        click.echo(f'   已同时标记为待复审')
-    if note:
-        click.echo(f'   备注: {note}')
-    click.echo(f'   查看历史: kb review history {entry.id[:8]}')
+    return entry, old_reviewer, action_note
 
 
-@review_cmd.command('done')
-@click.argument('entry_id')
-@click.option('--note', '-m', required=True, help='复审结论（必填）')
-@click.option('--mark-expired', type=click.Choice(['true', 'false']), help='是否标记为过期')
-@click.option('--reviewer', '-r', help='复审人（默认为条目的当前负责人）')
-def done_entry(entry_id, note, mark_expired, reviewer):
-    """完成复审（清除待复审状态，写结论，记录完整轨迹）
+@review_cmd.command('claim')
+@click.argument('entry_ids', nargs=-1, required=True)
+@click.option('--reviewer', '-r', help='负责人（默认为当前用户名）')
+@click.option('--note', '-m', default='', help='认领备注')
+@click.option('--mark-review', is_flag=True, help='同时标记为待复审')
+@click.option('--yes', '-y', is_flag=True, help='跳过预览确认，直接执行')
+def claim_entry(entry_ids, reviewer, note, mark_review, yes):
+    """批量认领条目（记录负责人，加入历史记录轨迹）
 
     \b
     用法：
-      kb review done 564d -m "已对照MySQL 8.0文档核对，参数依然有效"
-      kb review done 564d -m "内容已过时，建议删除" --mark-expired true
+      kb review claim 564d                                    # 单条认领
+      kb review claim 564d 81e0 28ff -y                      # 批量（直接执行）
+      kb review claim 564d 81e0 -r 张开发 -m "我来处理这批"    # 指派给某人
     """
     kb_root = find_kb_root()
     if not kb_root:
@@ -719,15 +755,72 @@ def done_entry(entry_id, note, mark_expired, reviewer):
 
     config = Config(kb_root)
     store = Store(config)
+    default_reviewer = _get_default_reviewer()
 
-    entry, err = store.resolve_entry(entry_id)
-    if err:
-        click.echo(f'错误: {err}', err=True)
+    resolved = []
+    errors = []
+    for eid in entry_ids:
+        entry, err = store.resolve_entry(eid)
+        if err:
+            errors.append((eid, err))
+        else:
+            resolved.append(entry)
+
+    if errors:
+        for eid, err in errors:
+            click.echo(f'⚠️  跳过 {eid}: {err}', err=True)
+
+    if not resolved:
+        click.echo('没有可操作的条目', err=True)
         sys.exit(1)
 
+    final_reviewer = reviewer or default_reviewer
+    click.echo(f'📋 认领预览 (共 {len(resolved)} 条)')
+    click.echo(f'   负责人: 👤 {final_reviewer}')
+    if note:
+        click.echo(f'   备注: {note}')
+    if mark_review:
+        click.echo(f'   同时标记为待复审')
+    click.echo('-' * 60)
+    for e in resolved:
+        badges = []
+        if e.expired:
+            badges.append('🚫过期')
+        if e.needs_review:
+            badges.append('📋待复审')
+        status = ' '.join(badges) if badges else '✅'
+        click.echo(f'   - {e.title} [{e.project}] {status} '
+                   f'(原负责人: {e.reviewer or "-"}) | ID: {e.id[:8]}')
+    click.echo('')
+
+    if not yes:
+        if not click.confirm(f'是否确认认领以上 {len(resolved)} 条?', default=True):
+            click.echo('已取消')
+            return
+
+    updated = []
+    for entry in resolved:
+        entry, old_rev, action_note = _do_claim_one(
+            entry, reviewer, note, mark_review, default_reviewer)
+        store.update_entry(entry)
+        updated.append((entry, old_rev))
+
+    click.echo('')
+    click.echo(f'✅ 已批量认领 {len(updated)} 条:')
+    for entry, old_rev in updated:
+        msg = f'   - {entry.title} ({entry.id[:8]}) → 👤 {entry.reviewer}'
+        if old_rev and old_rev != entry.reviewer:
+            msg += f' (原 {old_rev})'
+        click.echo(msg)
+    click.echo('')
+    click.echo('   查看某条历史: kb review history <ID>')
+
+
+def _do_done_one(entry, note, mark_expired, reviewer, default_reviewer):
+    """执行单条 done 操作，返回 (entry, old_review, old_expired)。"""
     old_review = entry.needs_review
     old_expired = entry.expired
-    final_reviewer = reviewer or entry.reviewer or _get_default_reviewer()
+    final_reviewer = reviewer or entry.reviewer or default_reviewer
 
     entry.needs_review = False
     if mark_expired is not None:
@@ -743,17 +836,90 @@ def done_entry(entry_id, note, mark_expired, reviewer):
         old_expired=old_expired,
         new_expired=entry.expired,
     )
+    return entry, old_review, old_expired
 
-    store.update_entry(entry)
 
-    status = []
-    if entry.expired:
-        status.append('已过期')
-    if not status:
-        status.append('正常')
+@review_cmd.command('done')
+@click.argument('entry_ids', nargs=-1, required=True)
+@click.option('--note', '-m', required=True, help='复审结论（必填）')
+@click.option('--mark-expired', type=click.Choice(['true', 'false']), help='是否标记为过期')
+@click.option('--reviewer', '-r', help='复审人（默认为条目的当前负责人或当前用户）')
+@click.option('--yes', '-y', is_flag=True, help='跳过预览确认，直接执行')
+def done_entry(entry_ids, note, mark_expired, reviewer, yes):
+    """批量完成复审（清除待复审状态，写结论，记录完整轨迹）
 
-    click.echo(f'✅ 复审完成: {entry.title} ({entry.id[:8]})')
-    click.echo(f'   复审人: 👤 {final_reviewer}')
+    \b
+    用法：
+      kb review done 564d -m "已核对内容有效"
+      kb review done 564d 81e0 -m "内容已过时，建议删除" --mark-expired true -y
+    """
+    kb_root = find_kb_root()
+    if not kb_root:
+        click.echo('错误: 未找到知识库，请先运行 kb init', err=True)
+        sys.exit(1)
+
+    config = Config(kb_root)
+    store = Store(config)
+    default_reviewer = _get_default_reviewer()
+
+    resolved = []
+    errors = []
+    for eid in entry_ids:
+        entry, err = store.resolve_entry(eid)
+        if err:
+            errors.append((eid, err))
+        else:
+            resolved.append(entry)
+
+    if errors:
+        for eid, err in errors:
+            click.echo(f'⚠️  跳过 {eid}: {err}', err=True)
+
+    if not resolved:
+        click.echo('没有可操作的条目', err=True)
+        sys.exit(1)
+
+    click.echo(f'📋 完成复审预览 (共 {len(resolved)} 条)')
     click.echo(f'   结论: {note}')
-    click.echo(f'   当前状态: {", ".join(status)}')
-    click.echo(f'   查看完整历史: kb review history {entry.id[:8]}')
+    if mark_expired is not None:
+        click.echo(f'   标记过期: {mark_expired}')
+    if reviewer:
+        click.echo(f'   指定复审人: 👤 {reviewer}')
+    click.echo('-' * 60)
+    for e in resolved:
+        badges = []
+        if e.expired:
+            badges.append('🚫过期')
+        if e.needs_review:
+            badges.append('📋待复审')
+        status = ' '.join(badges) if badges else '✅'
+        rev = e.reviewer or '-'
+        click.echo(f'   - {e.title} [{e.project}] {status} '
+                   f'(负责人: {rev}) | ID: {e.id[:8]}')
+    click.echo('')
+
+    if not yes:
+        if not click.confirm(f'是否确认完成以上 {len(resolved)} 条复审?', default=True):
+            click.echo('已取消')
+            return
+
+    updated = []
+    for entry in resolved:
+        entry, old_rev, old_exp = _do_done_one(
+            entry, note, mark_expired, reviewer, default_reviewer)
+        store.update_entry(entry)
+        updated.append(entry)
+
+    click.echo('')
+    click.echo(f'✅ 已完成 {len(updated)} 条复审:')
+    for entry in updated:
+        status = []
+        if entry.expired:
+            status.append('🚫过期')
+        if entry.needs_review:
+            status.append('📋待复审')
+        if not status:
+            status.append('✅')
+        click.echo(f'   - {entry.title} ({entry.id[:8]}) → {" ".join(status)}')
+    click.echo('')
+    click.echo('   查看某条历史: kb review history <ID>')

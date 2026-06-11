@@ -57,6 +57,24 @@
       "body_only": false,
       "include_expired": true
     },
-    "created_at": "2026-06-12T02:14:27.814099"
+    "created_at": "2026-06-12T02:33:00.953275",
+    "presets": {
+      "database-team": {
+        "description": "数据库团队日常排障默认参数",
+        "params": {
+          "查询词": "MySQL",
+          "项目名": "database"
+        },
+        "created_at": "2026-06-12T02:33:00.712812"
+      },
+      "k8s-team": {
+        "description": "K8s团队日常排障默认参数",
+        "params": {
+          "查询词": "Pod",
+          "项目名": "k8s"
+        },
+        "created_at": "2026-06-12T02:33:00.953018"
+      }
+    }
   }
 }

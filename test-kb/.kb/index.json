@@ -62,9 +62,36 @@
     "ticket_links": [],
     "expired": true,
     "needs_review": true,
-    "reviewer": "张开发",
-    "review_note": "这篇需要对照MySQL 8.0最新参数更新",
+    "reviewer": "李运维",
+    "review_note": "database组批量复审完成，内容整体有效，仅慢查询篇需补MySQL8.0参数",
     "review_history": [
+      {
+        "timestamp": "2026-06-12T02:32:24.657419",
+        "reviewer": "李运维",
+        "note": "",
+        "changes": {
+          "needs_review": {
+            "old": false,
+            "new": true
+          }
+        }
+      },
+      {
+        "timestamp": "2026-06-12T02:31:52.492841",
+        "reviewer": "李运维",
+        "note": "[DONE] database组批量复审完成，内容整体有效，仅慢查询篇需补MySQL8.0参数",
+        "changes": {
+          "needs_review": {
+            "old": true,
+            "new": false
+          }
+        }
+      },
+      {
+        "timestamp": "2026-06-12T02:31:38.056106",
+        "reviewer": "李运维",
+        "note": "[CLAIM] 我接手database团队复审（从 张开发 交接）"
+      },
       {
         "timestamp": "2026-06-12T01:27:33.575216",
         "reviewer": "张开发",
@@ -72,7 +99,7 @@
       }
     ],
     "created_at": "2026-06-12T00:30:27.068304",
-    "updated_at": "2026-06-12T01:27:33.575223",
+    "updated_at": "2026-06-12T02:32:24.657426",
     "last_accessed": null,
     "access_count": 0
   },
@@ -91,11 +118,39 @@
     "ticket_links": [],
     "expired": false,
     "needs_review": true,
-    "reviewer": null,
-    "review_note": null,
-    "review_history": [],
+    "reviewer": "李运维",
+    "review_note": "database组批量复审完成，内容整体有效，仅慢查询篇需补MySQL8.0参数",
+    "review_history": [
+      {
+        "timestamp": "2026-06-12T02:32:24.910226",
+        "reviewer": "李运维",
+        "note": "",
+        "changes": {
+          "needs_review": {
+            "old": false,
+            "new": true
+          }
+        }
+      },
+      {
+        "timestamp": "2026-06-12T02:31:52.516235",
+        "reviewer": "李运维",
+        "note": "[DONE] database组批量复审完成，内容整体有效，仅慢查询篇需补MySQL8.0参数",
+        "changes": {
+          "needs_review": {
+            "old": true,
+            "new": false
+          }
+        }
+      },
+      {
+        "timestamp": "2026-06-12T02:31:38.079496",
+        "reviewer": "李运维",
+        "note": "[CLAIM] 我接手database团队复审"
+      }
+    ],
     "created_at": "2026-06-12T00:30:39.669741",
-    "updated_at": "2026-06-12T00:33:25.504184",
+    "updated_at": "2026-06-12T02:32:24.910233",
     "last_accessed": null,
     "access_count": 0
   }
