@@ -2,12 +2,26 @@
   "find-k8s-trouble": {
     "command": "search \"Pod 启动失败\" --project k8s",
     "description": "K8s Pod 故障专用搜索",
-    "created_at": "2026-06-12T01:05:37.780664",
+    "group": "default",
+    "created_at": "2026-06-12T01:30:16.820940",
     "args": [
       "search",
       "Pod 启动失败",
       "--project",
       "k8s"
+    ]
+  },
+  "find-mysql-opt": {
+    "command": "search \"MySQL 优化\" --project database --include-expired",
+    "description": "查找MySQL相关的慢查询优化",
+    "group": "排障",
+    "created_at": "2026-06-12T01:30:16.821694",
+    "args": [
+      "search",
+      "MySQL 优化",
+      "--project",
+      "database",
+      "--include-expired"
     ]
   }
 }

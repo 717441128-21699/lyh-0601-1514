@@ -17,6 +17,9 @@
     ],
     "expired": false,
     "needs_review": false,
+    "reviewer": null,
+    "review_note": null,
+    "review_history": [],
     "created_at": "2026-06-12T00:30:15.566796",
     "updated_at": "2026-06-12T01:03:21.916561",
     "last_accessed": "2026-06-12T01:03:21.916556",
@@ -36,8 +39,17 @@
     "ticket_links": [],
     "expired": true,
     "needs_review": true,
+    "reviewer": "张开发",
+    "review_note": "这篇需要对照MySQL 8.0最新参数更新",
+    "review_history": [
+      {
+        "timestamp": "2026-06-12T01:27:33.575216",
+        "reviewer": "张开发",
+        "note": "这篇需要对照MySQL 8.0最新参数更新"
+      }
+    ],
     "created_at": "2026-06-12T00:30:27.068304",
-    "updated_at": "2026-06-12T01:03:52.151141",
+    "updated_at": "2026-06-12T01:27:33.575223",
     "last_accessed": null,
     "access_count": 0
   },
@@ -56,6 +68,9 @@
     "ticket_links": [],
     "expired": false,
     "needs_review": true,
+    "reviewer": null,
+    "review_note": null,
+    "review_history": [],
     "created_at": "2026-06-12T00:30:39.669741",
     "updated_at": "2026-06-12T00:33:25.504184",
     "last_accessed": null,

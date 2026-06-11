@@ -1,0 +1,32 @@
+{
+  "version": "1.0",
+  "exported_at": "2026-06-12T01:29:54.869326",
+  "count": 2,
+  "group_filter": null,
+  "shortcuts": {
+    "find-k8s-trouble": {
+      "command": "search \"Pod 启动失败\" --project k8s",
+      "description": "K8s Pod 故障专用搜索",
+      "created_at": "2026-06-12T01:05:37.780664",
+      "args": [
+        "search",
+        "Pod 启动失败",
+        "--project",
+        "k8s"
+      ]
+    },
+    "find-mysql-opt": {
+      "command": "search \"MySQL 优化\" --project database --include-expired",
+      "description": "查找MySQL相关的慢查询优化",
+      "group": "排障",
+      "created_at": "2026-06-12T01:29:06.626286",
+      "args": [
+        "search",
+        "MySQL 优化",
+        "--project",
+        "database",
+        "--include-expired"
+      ]
+    }
+  }
+}

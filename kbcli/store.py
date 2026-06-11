@@ -171,11 +171,12 @@ class Store:
             return json.load(f)
 
     def save_shortcut(self, name: str, command: str, description: str = '',
-                      args: Optional[List[str]] = None):
+                      args: Optional[List[str]] = None, group: str = 'default'):
         shortcuts = self.load_shortcuts()
         data = {
             'command': command,
             'description': description,
+            'group': group,
             'created_at': datetime.now().isoformat(),
         }
         if args is not None:
@@ -184,6 +185,18 @@ class Store:
         self._ensure_dirs()
         with open(self.config.shortcuts_path, 'w', encoding='utf-8') as f:
             json.dump(shortcuts, f, ensure_ascii=False, indent=2)
+
+    def save_shortcuts(self, shortcuts_data: Dict[str, Dict], overwrite: bool = False):
+        """批量保存快捷命令，用于导入。"""
+        if overwrite:
+            data = shortcuts_data
+        else:
+            existing = self.load_shortcuts()
+            existing.update(shortcuts_data)
+            data = existing
+        self._ensure_dirs()
+        with open(self.config.shortcuts_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
 
     def delete_shortcut(self, name: str) -> bool:
         shortcuts = self.load_shortcuts()
@@ -232,6 +245,8 @@ class Store:
             'ticket_links': entry.ticket_links,
             'expired': entry.expired,
             'needs_review': entry.needs_review,
+            'reviewer': entry.reviewer,
+            'review_note': entry.review_note,
             'created_at': entry.created_at,
             'updated_at': entry.updated_at,
         }
@@ -241,6 +256,7 @@ class Store:
         pass
 
     def check_broken_links(self) -> List[Dict]:
+        from .commands.link import extract_url
         import urllib.request
         import urllib.error
         index = self.load_index()
@@ -248,9 +264,10 @@ class Store:
         for entry in index.values():
             all_links = entry.links + entry.ticket_links
             for link in all_links:
+                url = extract_url(link)
                 try:
-                    if link.startswith('http://') or link.startswith('https://'):
-                        req = urllib.request.Request(link, method='HEAD')
+                    if url.startswith('http://') or url.startswith('https://'):
+                        req = urllib.request.Request(url, method='HEAD')
                         with urllib.request.urlopen(req, timeout=5) as resp:
                             if resp.status >= 400:
                                 broken.append({
