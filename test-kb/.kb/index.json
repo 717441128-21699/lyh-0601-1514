@@ -1,0 +1,64 @@
+{
+  "28ff201db4cf": {
+    "id": "28ff201db4cf",
+    "title": "Kubernetes Pod 启动失败排查指南",
+    "content": "## 常见原因\n\n1. 镜像拉取失败\n   - 检查镜像地址是否正确\n   - 检查网络连接\n   - 检查 imagePullSecret\n\n2. 资源不足\n   - 检查节点资源\n   - 检查 requests/limits 设置\n\n3. 配置错误\n   - 检查 ConfigMap/Secret 是否存在\n   - 检查环境变量配置",
+    "project": "k8s",
+    "tags": [
+      "运维",
+      "kubernetes",
+      "故障排查"
+    ],
+    "links": [
+      "K8s 官方文档: https://kubernetes.io/docs/"
+    ],
+    "ticket_links": [
+      "https://jira.example.com/browse/DEV-1234"
+    ],
+    "expired": false,
+    "needs_review": false,
+    "created_at": "2026-06-12T00:30:15.566796",
+    "updated_at": "2026-06-12T00:41:25.042216",
+    "last_accessed": "2026-06-12T00:41:25.042211",
+    "access_count": 1
+  },
+  "564da94281d4": {
+    "id": "564da94281d4",
+    "title": "MySQL 慢查询优化实践",
+    "content": "## 慢查询定位\n使用 slow_query_log 开启慢查询日志。\n\n## 优化方法\n1. 添加索引\n2. 优化 SQL 语句\n3. 分库分表",
+    "project": "database",
+    "tags": [
+      "数据库",
+      "MySQL",
+      "性能优化"
+    ],
+    "links": [],
+    "ticket_links": [],
+    "expired": true,
+    "needs_review": false,
+    "created_at": "2026-06-12T00:30:27.068304",
+    "updated_at": "2026-06-12T00:39:56.834000",
+    "last_accessed": null,
+    "access_count": 0
+  },
+  "81e0653b5d7a": {
+    "id": "81e0653b5d7a",
+    "title": "Redis 缓存穿透问题解决方案",
+    "content": "缓存穿透是指查询一个不存在的数据，缓存和数据库都没有命中。\n\n解决方案：\n1. 布隆过滤器\n2. 缓存空值\n3. 接口层增加校验",
+    "project": "database",
+    "tags": [
+      "数据库",
+      "Redis",
+      "缓存",
+      "故障排查"
+    ],
+    "links": [],
+    "ticket_links": [],
+    "expired": false,
+    "needs_review": true,
+    "created_at": "2026-06-12T00:30:39.669741",
+    "updated_at": "2026-06-12T00:33:25.504184",
+    "last_accessed": null,
+    "access_count": 0
+  }
+}
