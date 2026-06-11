@@ -208,6 +208,43 @@ class Store:
             json.dump(shortcuts, f, ensure_ascii=False, indent=2)
         return True
 
+    # ---- Saved Query Templates ----
+    def load_templates(self) -> Dict[str, Dict]:
+        if not self.config.templates_path.exists():
+            return {}
+        with open(self.config.templates_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+
+    def save_template(self, name: str, template: Dict):
+        templates = self.load_templates()
+        data = dict(template)
+        data['created_at'] = datetime.now().isoformat()
+        templates[name] = data
+        self._ensure_dirs()
+        with open(self.config.templates_path, 'w', encoding='utf-8') as f:
+            json.dump(templates, f, ensure_ascii=False, indent=2)
+
+    def delete_template(self, name: str) -> bool:
+        templates = self.load_templates()
+        if name not in templates:
+            return False
+        del templates[name]
+        self._ensure_dirs()
+        with open(self.config.templates_path, 'w', encoding='utf-8') as f:
+            json.dump(templates, f, ensure_ascii=False, indent=2)
+        return True
+
+    def save_templates(self, templates_data: Dict[str, Dict], overwrite: bool = False):
+        if overwrite:
+            data = templates_data
+        else:
+            existing = self.load_templates()
+            existing.update(templates_data)
+            data = existing
+        self._ensure_dirs()
+        with open(self.config.templates_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
     def list_projects(self) -> List[str]:
         index = self.load_index()
         projects = set()

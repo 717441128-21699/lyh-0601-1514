@@ -7,6 +7,7 @@ CONFIG_FILE = 'config.json'
 INDEX_FILE = 'index.json'
 HISTORY_FILE = 'history.json'
 SHORTCUTS_FILE = 'shortcuts.json'
+TEMPLATES_FILE = 'templates.json'
 ENTRIES_DIR = 'entries'
 PROJECTS_DIR = 'projects'
 
@@ -19,6 +20,7 @@ class Config:
         self.index_path = self.kb_dir / INDEX_FILE
         self.history_path = self.kb_dir / HISTORY_FILE
         self.shortcuts_path = self.kb_dir / SHORTCUTS_FILE
+        self.templates_path = self.kb_dir / TEMPLATES_FILE
         self.entries_dir = self.kb_dir / ENTRIES_DIR
         self.projects_dir = self.kb_dir / PROJECTS_DIR
 

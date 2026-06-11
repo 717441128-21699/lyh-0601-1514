@@ -1,6 +1,8 @@
 import click
 import sys
+import json
 from datetime import datetime, timedelta
+from pathlib import Path
 import os
 
 from ..config import find_kb_root, Config
@@ -410,3 +412,348 @@ def stats(by_reviewer):
         tag_counts.sort(key=lambda x: x[1], reverse=True)
         for tag, count in tag_counts[:10]:
             click.echo(f'  {tag}: {count}')
+
+
+def _build_handoff_markdown(entries, title='复审交接清单'):
+    """生成交接清单的 Markdown 内容。"""
+    lines = []
+    lines.append(f'# 🔄 {title}')
+    lines.append('')
+    lines.append(f'> 生成时间: **{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}**')
+    lines.append('')
+
+    expired = [e for e in entries if e.expired]
+    need_review = [e for e in entries if e.needs_review]
+    unassigned = [e for e in need_review if not e.reviewer]
+
+    lines.append('## 📊 概览')
+    lines.append('')
+    lines.append(f'- 📋 待复审总数: **{len(need_review)}** 条')
+    lines.append(f'  - 已指派: **{len(need_review) - len(unassigned)}** 条')
+    lines.append(f'  - 未指派: **{len(unassigned)}** 条')
+    lines.append(f'- 🚫 已过期: **{len(expired)}** 条')
+    lines.append(f'- 📁 涉及项目: **{len(set(e.project for e in entries))}** 个')
+    lines.append(f'- 👤 负责人数: **{len(set(e.reviewer for e in entries if e.reviewer))}** 人')
+    lines.append('')
+
+    lines.append('## 👥 按负责人交接')
+    lines.append('')
+
+    reviewer_map = {}
+    for e in need_review:
+        r = e.reviewer or '(未指派)'
+        if r not in reviewer_map:
+            reviewer_map[r] = []
+        reviewer_map[r].append(e)
+
+    if not reviewer_map:
+        lines.append('暂无待复审条目 ✅')
+        lines.append('')
+
+    for reviewer in sorted(reviewer_map.keys()):
+        rev_entries = sorted(reviewer_map[reviewer], key=lambda x: x.updated_at)
+        rev_expired = [e for e in rev_entries if e.expired]
+        reviewer_icon = '👤' if reviewer != '(未指派)' else '⚠️ '
+        lines.append(f'### {reviewer_icon} {reviewer} (共 {len(rev_entries)} 条)')
+        lines.append('')
+        if rev_expired:
+            lines.append(f'> ⚠️  其中 **{len(rev_expired)}** 条已过期，需要优先处理')
+            lines.append('')
+        lines.append('| # | 标题 | 项目 | 状态 | 备注 | 更新时间 | ID |')
+        lines.append('|---|------|------|------|------|----------|----|')
+        for i, e in enumerate(rev_entries, 1):
+            title_link = e.title.replace('|', '\\|')
+            badges = []
+            if e.expired:
+                badges.append('🚫过期')
+            badges.append('📋待复审')
+            status_md = ' '.join(badges)
+            note_md = (e.review_note or '').replace('|', '\\|')
+            if len(note_md) > 40:
+                note_md = note_md[:40] + '...'
+            lines.append(f'| {i} | {title_link} | {e.project} | {status_md} | {note_md or "-"} | {e.updated_at[:10]} | `{e.id[:8]}` |')
+        lines.append('')
+
+    if expired:
+        lines.append('## 🚫 过期内容清单')
+        lines.append('')
+        lines.append('| # | 标题 | 项目 | 负责人 | 备注 | 更新时间 |')
+        lines.append('|---|------|------|--------|------|----------|')
+        for i, e in enumerate(sorted(expired, key=lambda x: x.updated_at), 1):
+            title_link = e.title.replace('|', '\\|')
+            note_md = (e.review_note or '').replace('|', '\\|')
+            if len(note_md) > 40:
+                note_md = note_md[:40] + '...'
+            lines.append(f'| {i} | {title_link} | {e.project} | {e.reviewer or "-"} | {note_md or "-"} | {e.updated_at[:10]} |')
+        lines.append('')
+
+    lines.append('## 📝 交接说明')
+    lines.append('')
+    lines.append('### 处理优先级建议：')
+    lines.append('1. **P0 - 已过期 + 待复审**：内容已失效且需要审核，立即处理')
+    lines.append('2. **P1 - 已过期**：内容不再适用，更新或删除')
+    lines.append('3. **P2 - 待复审**：检查内容准确性，标记状态')
+    lines.append('')
+    lines.append('### 常用命令：')
+    lines.append('```bash')
+    lines.append('kb review list                      # 查看所有待复审')
+    lines.append('kb review mark <ID> --review false   # 完成复审，清除待复审标记')
+    lines.append('kb review mark <ID> --expired true   # 标记为过期')
+    lines.append('kb show <ID>                         # 查看条目的完整内容')
+    lines.append('kb review done <ID> -m "结论"         # 完成复审并写结论')
+    lines.append('```')
+    lines.append('')
+
+    return '\n'.join(lines)
+
+
+def _build_handoff_json(entries, title='复审交接清单'):
+    """生成交接清单的 JSON 内容。"""
+    expired = [e for e in entries if e.expired]
+    need_review = [e for e in entries if e.needs_review]
+
+    reviewer_map = {}
+    for e in need_review:
+        r = e.reviewer or '(未指派)'
+        if r not in reviewer_map:
+            reviewer_map[r] = []
+        reviewer_map[r].append(e.to_dict())
+
+    return {
+        'title': title,
+        'generated_at': datetime.now().isoformat(),
+        'summary': {
+            'total_needs_review': len(need_review),
+            'assigned': len([e for e in need_review if e.reviewer]),
+            'unassigned': len([e for e in need_review if not e.reviewer]),
+            'expired_count': len(expired),
+            'projects': sorted(set(e.project for e in entries)),
+            'reviewers': sorted(set(e.reviewer for e in entries if e.reviewer)),
+        },
+        'by_reviewer': {k: v for k, v in sorted(reviewer_map.items())},
+        'expired_list': [e.to_dict() for e in expired],
+    }
+
+
+@review_cmd.command('handoff')
+@click.option('--reviewer', '-r', help='仅导出指定负责人的条目')
+@click.option('--project', '-p', help='仅导出指定项目的条目')
+@click.option('--format', '-f', 'fmt', type=click.Choice(['markdown', 'json', 'both']),
+              default='markdown', help='输出格式')
+@click.option('--output', '-o', help='输出目录或文件名（不指定则输出到标准输出）')
+@click.option('--all-entries', is_flag=True, help='包含所有状态条目（不只待复审和过期）')
+def handoff(reviewer, project, fmt, output, all_entries):
+    """生成复审交接清单（按负责人/项目分组，支持 Markdown/JSON）
+
+    \b
+    用法：
+      kb review handoff                        # 生成全库交接清单
+      kb review handoff -r 张开发               # 生成某负责人的清单
+      kb review handoff -p database -f json     # 某项目导出JSON
+      kb review handoff -o ./handoff -f both    # 同时输出md和json到目录
+    """
+    kb_root = find_kb_root()
+    if not kb_root:
+        click.echo('错误: 未找到知识库，请先运行 kb init', err=True)
+        sys.exit(1)
+
+    config = Config(kb_root)
+    store = Store(config)
+
+    all_db = store.list_entries(project=project)
+
+    if all_entries:
+        entries = all_db
+    else:
+        entries = [e for e in all_db if e.needs_review or e.expired]
+
+    if reviewer:
+        entries = [e for e in entries if e.reviewer == reviewer or (reviewer == '(未指派)' and not e.reviewer)]
+
+    if not entries:
+        click.echo('没有需要交接的条目 ✅')
+        return
+
+    title_parts = ['复审交接清单']
+    if project:
+        title_parts.append(f'项目: {project}')
+    if reviewer:
+        title_parts.append(f'负责人: {reviewer}')
+    title = ' - '.join(title_parts)
+
+    md_content = _build_handoff_markdown(entries, title=title)
+    json_data = _build_handoff_json(entries, title=title)
+
+    if output:
+        out_path = Path(output)
+        if out_path.suffix in ('.md', '.json'):
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            file_path = out_path
+            if fmt == 'both':
+                base = out_path.stem
+                p = out_path.parent
+                if out_path.suffix == '.md':
+                    md_target = out_path
+                    json_target = p / f'{base}.json'
+                else:
+                    json_target = out_path
+                    md_target = p / f'{base}.md'
+                with open(md_target, 'w', encoding='utf-8') as f:
+                    f.write(md_content)
+                with open(json_target, 'w', encoding='utf-8') as f:
+                    json.dump(json_data, f, ensure_ascii=False, indent=2)
+                click.echo(f'✅ 已生成交接清单:')
+                click.echo(f'   Markdown: {md_target}')
+                click.echo(f'   JSON:     {json_target}')
+            else:
+                if out_path.suffix == '.md' and fmt != 'json':
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        f.write(md_content)
+                    click.echo(f'✅ 已生成交接清单: {file_path}')
+                elif out_path.suffix == '.json' and fmt != 'markdown':
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        json.dump(json_data, f, ensure_ascii=False, indent=2)
+                    click.echo(f'✅ 已生成交接清单: {file_path}')
+        else:
+            out_path.mkdir(parents=True, exist_ok=True)
+            md_file = out_path / 'handoff.md'
+            json_file = out_path / 'handoff.json'
+            generated = []
+            if fmt in ('markdown', 'both'):
+                with open(md_file, 'w', encoding='utf-8') as f:
+                    f.write(md_content)
+                generated.append(f'Markdown: {md_file}')
+            if fmt in ('json', 'both'):
+                with open(json_file, 'w', encoding='utf-8') as f:
+                    json.dump(json_data, f, ensure_ascii=False, indent=2)
+                generated.append(f'JSON:     {json_file}')
+            click.echo(f'✅ 已生成交接清单:')
+            for g in generated:
+                click.echo(f'   {g}')
+    else:
+        if fmt in ('markdown', 'both'):
+            click.echo(md_content)
+        if fmt == 'both':
+            click.echo('\n\n' + '=' * 60 + '\n')
+        if fmt in ('json', 'both'):
+            click.echo(json.dumps(json_data, ensure_ascii=False, indent=2))
+
+
+@review_cmd.command('claim')
+@click.argument('entry_id')
+@click.option('--reviewer', '-r', help='负责人（默认为当前用户名）')
+@click.option('--note', '-m', default='', help='认领备注')
+@click.option('--mark-review', is_flag=True, help='同时标记为待复审')
+def claim_entry(entry_id, reviewer, note, mark_review):
+    """认领条目（记录负责人，加入历史记录轨迹）
+
+    \b
+    用法：
+      kb review claim 564d                          # 认领（默认自己）
+      kb review claim 564d -r 张开发 -m "我来处理"   # 指派给某人
+    """
+    kb_root = find_kb_root()
+    if not kb_root:
+        click.echo('错误: 未找到知识库，请先运行 kb init', err=True)
+        sys.exit(1)
+
+    config = Config(kb_root)
+    store = Store(config)
+
+    entry, err = store.resolve_entry(entry_id)
+    if err:
+        click.echo(f'错误: {err}', err=True)
+        sys.exit(1)
+
+    old_reviewer = entry.reviewer
+    if reviewer:
+        entry.reviewer = reviewer
+    else:
+        entry.reviewer = _get_default_reviewer()
+
+    old_review = entry.needs_review
+    if mark_review:
+        entry.needs_review = True
+
+    action_note = note if note else '认领该条目'
+    if old_reviewer:
+        action_note = f'{action_note}（从 {old_reviewer} 交接）'
+
+    entry.add_review_record(
+        reviewer=entry.reviewer,
+        note=f'[CLAIM] {action_note}',
+        old_review=old_review,
+        new_review=entry.needs_review,
+    )
+
+    store.update_entry(entry)
+
+    click.echo(f'✅ 条目已认领: {entry.title} ({entry.id[:8]})')
+    click.echo(f'   负责人: 👤 {entry.reviewer}')
+    if old_reviewer and old_reviewer != entry.reviewer:
+        click.echo(f'   原负责人: {old_reviewer}')
+    if mark_review:
+        click.echo(f'   已同时标记为待复审')
+    if note:
+        click.echo(f'   备注: {note}')
+    click.echo(f'   查看历史: kb review history {entry.id[:8]}')
+
+
+@review_cmd.command('done')
+@click.argument('entry_id')
+@click.option('--note', '-m', required=True, help='复审结论（必填）')
+@click.option('--mark-expired', type=click.Choice(['true', 'false']), help='是否标记为过期')
+@click.option('--reviewer', '-r', help='复审人（默认为条目的当前负责人）')
+def done_entry(entry_id, note, mark_expired, reviewer):
+    """完成复审（清除待复审状态，写结论，记录完整轨迹）
+
+    \b
+    用法：
+      kb review done 564d -m "已对照MySQL 8.0文档核对，参数依然有效"
+      kb review done 564d -m "内容已过时，建议删除" --mark-expired true
+    """
+    kb_root = find_kb_root()
+    if not kb_root:
+        click.echo('错误: 未找到知识库，请先运行 kb init', err=True)
+        sys.exit(1)
+
+    config = Config(kb_root)
+    store = Store(config)
+
+    entry, err = store.resolve_entry(entry_id)
+    if err:
+        click.echo(f'错误: {err}', err=True)
+        sys.exit(1)
+
+    old_review = entry.needs_review
+    old_expired = entry.expired
+    final_reviewer = reviewer or entry.reviewer or _get_default_reviewer()
+
+    entry.needs_review = False
+    if mark_expired is not None:
+        entry.expired = mark_expired == 'true'
+    entry.reviewer = final_reviewer
+    entry.review_note = note
+
+    entry.add_review_record(
+        reviewer=final_reviewer,
+        note=f'[DONE] {note}',
+        old_review=old_review,
+        new_review=entry.needs_review,
+        old_expired=old_expired,
+        new_expired=entry.expired,
+    )
+
+    store.update_entry(entry)
+
+    status = []
+    if entry.expired:
+        status.append('已过期')
+    if not status:
+        status.append('正常')
+
+    click.echo(f'✅ 复审完成: {entry.title} ({entry.id[:8]})')
+    click.echo(f'   复审人: 👤 {final_reviewer}')
+    click.echo(f'   结论: {note}')
+    click.echo(f'   当前状态: {", ".join(status)}')
+    click.echo(f'   查看完整历史: kb review history {entry.id[:8]}')

@@ -10,6 +10,7 @@ from .commands import (
     review_cmd,
     export_cmd,
     shortcut_cmd,
+    template_cmd,
 )
 
 
@@ -37,6 +38,7 @@ cli.add_command(link_cmd)
 cli.add_command(review_cmd)
 cli.add_command(export_cmd)
 cli.add_command(shortcut_cmd)
+cli.add_command(template_cmd)
 
 
 def main():

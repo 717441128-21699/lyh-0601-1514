@@ -5,3 +5,4 @@ from .link import link_cmd
 from .review import review_cmd
 from .export import export_cmd
 from .shortcut import shortcut_cmd
+from .template import template_cmd

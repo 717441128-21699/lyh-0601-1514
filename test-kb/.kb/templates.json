@@ -1,0 +1,62 @@
+{
+  "project-troubleshoot": {
+    "description": "项目排障专用模板，指定关键词和项目名",
+    "group": "排障",
+    "query_template": "{关键词} 故障 -临时方案",
+    "params": [
+      {
+        "name": "关键词",
+        "prompt": "请输入 关键词",
+        "optional": false,
+        "default": ""
+      },
+      {
+        "name": "项目名",
+        "prompt": "请输入 项目名",
+        "optional": false,
+        "default": ""
+      }
+    ],
+    "search_kwargs_template": {
+      "must_keywords": [],
+      "exclude_keywords": [],
+      "project": "{项目名}",
+      "tags_template": "",
+      "reviewer": "",
+      "title_only": false,
+      "body_only": false,
+      "include_expired": true
+    },
+    "created_at": "2026-06-12T02:14:27.813300"
+  },
+  "db-search": {
+    "description": "数据库项目搜索模板",
+    "group": "排障",
+    "query_template": "{查询词}",
+    "params": [
+      {
+        "name": "查询词",
+        "prompt": "请输入 查询词",
+        "optional": false,
+        "default": ""
+      },
+      {
+        "name": "项目名",
+        "prompt": "请输入 项目名",
+        "optional": false,
+        "default": ""
+      }
+    ],
+    "search_kwargs_template": {
+      "must_keywords": [],
+      "exclude_keywords": [],
+      "project": "{项目名}",
+      "tags_template": "",
+      "reviewer": "",
+      "title_only": false,
+      "body_only": false,
+      "include_expired": true
+    },
+    "created_at": "2026-06-12T02:14:27.814099"
+  }
+}

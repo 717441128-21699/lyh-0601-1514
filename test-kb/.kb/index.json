@@ -17,11 +17,34 @@
     ],
     "expired": false,
     "needs_review": false,
-    "reviewer": null,
-    "review_note": null,
-    "review_history": [],
+    "reviewer": "李运维",
+    "review_note": "对照最新K8s 1.29文档核对，内容依然有效，部分参数建议补充",
+    "review_history": [
+      {
+        "timestamp": "2026-06-12T01:55:18.346401",
+        "reviewer": "李运维",
+        "note": "[DONE] 对照最新K8s 1.29文档核对，内容依然有效，部分参数建议补充",
+        "changes": {
+          "needs_review": {
+            "old": true,
+            "new": false
+          }
+        }
+      },
+      {
+        "timestamp": "2026-06-12T01:54:59.592494",
+        "reviewer": "李运维",
+        "note": "[CLAIM] K8s故障排查我来接手",
+        "changes": {
+          "needs_review": {
+            "old": false,
+            "new": true
+          }
+        }
+      }
+    ],
     "created_at": "2026-06-12T00:30:15.566796",
-    "updated_at": "2026-06-12T01:03:21.916561",
+    "updated_at": "2026-06-12T01:55:18.346408",
     "last_accessed": "2026-06-12T01:03:21.916556",
     "access_count": 2
   },

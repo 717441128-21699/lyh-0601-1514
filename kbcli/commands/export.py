@@ -100,8 +100,24 @@ def _get_status_badge(entry):
     return badges
 
 
+def _entry_relpath(e, layout='nested'):
+    """根据目录布局计算条目相对路径。
+
+    layout:
+      - 'nested': 条目在 {project}/ 子目录中（全库导出、tag 导出、过滤导出）
+                  -> 路径: ./project/title.md
+      - 'flat':   条目和 README 同目录（单 project 导出）
+                  -> 路径: ./title.md
+    """
+    safe_title = _sanitize_filename(e.title)
+    if layout == 'flat':
+        return _norm_path(Path('.') / f'{safe_title}.md')
+    else:
+        return _norm_path(Path('.') / e.project / f'{safe_title}.md')
+
+
 def _write_change_summary(entries, output_dir, summary_path, filter_desc='',
-                         include_expired=False):
+                         include_expired=False, layout='nested'):
     """生成导出变更摘要文档。"""
     lines = []
     lines.append(f'# 📦 知识库导出变更摘要')
@@ -149,13 +165,12 @@ def _write_change_summary(entries, output_dir, summary_path, filter_desc='',
         lines.append('| # | 标题 | 项目 | 负责人 | 备注 | 更新时间 |')
         lines.append('|---|------|------|--------|------|----------|')
         for i, e in enumerate(need_review, 1):
-            safe_title = _sanitize_filename(e.title)
             link_title = e.title.replace('|', '\\|')
             reviewer = e.reviewer or '-'
             note = e.review_note.replace('|', '\\|') if e.review_note else '-'
             if len(note) > 30:
                 note = note[:30] + '...'
-            rel_path = _norm_path(Path('.') / e.project / f'{safe_title}.md')
+            rel_path = _entry_relpath(e, layout)
             lines.append(f'| {i} | [{link_title}]({rel_path}) | {e.project} | {reviewer} | {note} | {e.updated_at[:10]} |')
         lines.append('')
 
@@ -165,10 +180,9 @@ def _write_change_summary(entries, output_dir, summary_path, filter_desc='',
         lines.append('| # | 标题 | 项目 | 负责人 | 更新时间 |')
         lines.append('|---|------|------|--------|----------|')
         for i, e in enumerate(expired, 1):
-            safe_title = _sanitize_filename(e.title)
             link_title = e.title.replace('|', '\\|')
             reviewer = e.reviewer or '-'
-            rel_path = _norm_path(Path('.') / e.project / f'{safe_title}.md')
+            rel_path = _entry_relpath(e, layout)
             lines.append(f'| {i} | [{link_title}]({rel_path}) | {e.project} | {reviewer} | {e.updated_at[:10]} |')
         lines.append('')
 
@@ -197,11 +211,10 @@ def _write_change_summary(entries, output_dir, summary_path, filter_desc='',
             lines.append('| # | 标题 | 项目 | 状态 | 更新时间 |')
             lines.append('|---|------|------|------|----------|')
             for i, e in enumerate(reviewer_entries, 1):
-                safe_title = _sanitize_filename(e.title)
                 link_title = e.title.replace('|', '\\|')
                 badges = _get_status_badge(e)
                 status = ' '.join(badges) if badges else '✅'
-                rel_path = _norm_path(Path('.') / e.project / f'{safe_title}.md')
+                rel_path = _entry_relpath(e, layout)
                 lines.append(f'| {i} | [{link_title}]({rel_path}) | {e.project} | {status} | {e.updated_at[:10]} |')
             lines.append('')
 
@@ -214,7 +227,9 @@ def _write_change_summary(entries, output_dir, summary_path, filter_desc='',
         f.write('\n'.join(lines))
 
 
-def _write_team_index(entries, index_path, title='知识库', include_reviewer=True):
+def _write_team_index(entries, index_path, title='知识库', include_reviewer=True,
+                      layout='nested'):
+    """生成团队索引。"""
     lines = []
     lines.append(f'# 🏢 团队知识库 - {title}')
     lines.append('')
@@ -277,9 +292,8 @@ def _write_team_index(entries, index_path, title='知识库', include_reviewer=T
             updated = e.updated_at[:10]
             accessed = f'{e.access_count}次'
             last = e.last_accessed[:10] if e.last_accessed else '从未'
-            safe_title = _sanitize_filename(e.title)
             link_title = e.title.replace('|', '\\|')
-            rel_path = _norm_path(Path('.') / proj / f'{safe_title}.md')
+            rel_path = _entry_relpath(e, layout)
 
             row = [str(i), f'[{link_title}]({rel_path})', tags_md, status_md]
             if include_reviewer:
@@ -505,7 +519,8 @@ def export_project(project_name, output_dir, include_expired, include_meta, incl
         _write_entry_file(entry, filepath, include_meta=include_meta)
 
     index_path = output_path / 'README.md'
-    _write_team_index(entries, index_path, title=f'项目: {project_name}', include_reviewer=include_reviewer)
+    _write_team_index(entries, index_path, title=f'项目: {project_name}',
+                      include_reviewer=include_reviewer, layout='flat')
 
     if include_summary:
         summary_path = output_path / 'CHANGELOG.md'
@@ -518,6 +533,7 @@ def export_project(project_name, output_dir, include_expired, include_meta, incl
             summary_path=summary_path,
             filter_desc=filter_desc,
             include_expired=include_expired,
+            layout='flat',
         )
 
     click.echo(f'✅ 已导出项目 {project_name} 的 {len(entries)} 条到 {_norm_path(output_path)}')
